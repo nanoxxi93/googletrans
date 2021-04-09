@@ -13,6 +13,7 @@ hyperframe==5.2.0
 idna==2.10
 itsdangerous==1.1.0
 Jinja2==2.11.3
+logdna==1.7.0
 MarkupSafe==1.1.1
 rfc3986==1.4.0
 sniffio==1.2.0

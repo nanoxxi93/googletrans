@@ -1,18 +1,13 @@
-﻿"""
-This script runs the application using a development server.
-It contains the definition of routes and views for the application.
-"""
-
+﻿import json
 from flask import Flask, jsonify, request, url_for, render_template
 from flask import render_template, Blueprint, make_response
+import logging
+from logdna import LogDNAHandler
+import datetime
 from urllib import request as rq
 from googletrans import Translator
-import logging
-import datetime
-import json
 
 app = Flask(__name__)
-#app.debug = True
 
 class PrefixMiddleware(object):
 #class for URL sorting 
@@ -34,25 +29,45 @@ class PrefixMiddleware(object):
 # wsgi_app = app.wsgi_app
 app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/api')
 
-logging.basicConfig(filename='log.log',level=logging.DEBUG,format='%(asctime)s - %(process)d-%(levelname)s-%(message)s')
+ingestionKey = 'b7c813e09f26938d8bcd7c4f38be2a40'
+logdna_options = {
+  'app': 'stt',
+  'level': 'Debug',
+  'index_meta': True
+}
+logging.basicConfig(
+    handlers=[
+        logging.FileHandler(filename='log.log', encoding='utf-8', mode='a+'),
+        LogDNAHandler(ingestionKey, logdna_options)
+    ],
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s %(message)s',
+    datefmt='%Y%m%d.%H%M%S'
+)
 
-def detect(text):
+def fn_detect(text):
+    fnc = 'fn_detect'
     try:
-        logging.debug('Text: {}'.format(text))
+        if not (type(text) == str and text != ''):
+            raise TypeError('text should be a string')
+        logging.debug('{} --> Text: {}'.format(fnc, text))
         translator = Translator()
         language = translator.detect(text)
-        logging.debug('Language: {}'.format(language))
+        logging.debug('{} --> Language: {}'.format(fnc, language))
         return language.lang
     except Exception as e:
-        logging.exception('Error: {} '.format(e))
-        raise(e)
+        raise e
 
-def translate(text, source, target):
+def fn_translate(text, source, target):
+    fnc = 'fn_translate'
     try:
-        logging.debug('Text: {}'.format(text))
+        if not (type(text) == str and text != ''):
+            raise TypeError('text should be a string')
+        logging.debug('{} --> Text: {}'.format(fnc, text))
+        logging.debug('{} --> Model: {}-{}'.format(fnc, source, target))
         translator = Translator()
         if source is not None or target is not None:
-            logging.debug('{} -> {}'.format(source, target))
+            pass
         if source is None and target is None:
             translation = translator.translate(text)
         elif source is None:
@@ -61,47 +76,70 @@ def translate(text, source, target):
             translation = translator.translate(text, src=source)
         else:
             translation = translator.translate(text, src=source, dest=target)
-        logging.debug('Translation: {}'.format(translation))
+        logging.debug('{} --> Translation: {}'.format(fnc, translation))
         return translation.text
     except Exception as e:
-        logging.exception('Error: {} '.format(e))
-        raise(e)
+        raise e
 
 @app.route('/detect', methods=['GET','POST'])
-def detectController():
+def detect_controller():
+    endpoint = request.endpoint
     try:
         if (request.method == 'POST'):
-            some_json = request.get_json() # request -> json
-            text = some_json['text']
-            result = detect(text)
-        elif (request.method == 'GET'):
-            result = 'Envíe un POST con "text"'
-        return jsonify(result), 200
+            if (request.is_json):
+                request_json = request.get_json() # request -> json
+                logging.debug('{} --> REQUEST: {}'.format(endpoint, json.dumps(request_json)))
+                text = request_json['text']
+                result = fn_detect(text)
+                logging.info('{} --> RESULT: {}'.format(endpoint, result))
+                return jsonify(result), 200
+            else:
+                raise TypeError('The body is not a valid json')
+        else:
+            return 'Method not allowed', 400
+    except KeyError as e:
+        logging.exception(e)
+        return '{} parameter not found'.format(str(e)), 400
+    except (AssertionError, TypeError, ValueError) as e:
+        logging.exception(e)
+        return str(e), 400
     except Exception as e:
-        logging.exception('Exception occurred {}'.format(e))
-        return jsonify(str(e)), 401
+        logging.exception(e)
+        return 'Please contact with support', 400
 
 @app.route('/translate', methods=['GET','POST'])
-def translateController():
+def translate_controller():
+    endpoint = request.endpoint
     try:
         if (request.method == 'POST'):
-            some_json = request.get_json() # request -> json
-            text = some_json['text']
-            source = some_json.get('source', None)
-            target = some_json.get('target', None)
-            result = translate(text, source, target)
-        elif (request.method == 'GET'):
-            result = 'Envíe un POST con "text", "source" y "target"'
-        return jsonify(result), 200
+            if (request.is_json):
+                request_json = request.get_json() # request -> json
+                logging.debug('{} --> REQUEST: {}'.format(endpoint, json.dumps(request_json)))
+                text = request_json['text']
+                source = request_json.get('source', None)
+                target = request_json.get('target', None)
+                result = fn_translate(text, source, target)
+                logging.info('{} --> RESULT: {}'.format(endpoint, result))
+                return jsonify(result), 200
+            else:
+                raise TypeError('The body is not a valid json')
+        else:
+            return 'Method not allowed', 400
+    except KeyError as e:
+        logging.exception(e)
+        return '{} parameter not found'.format(str(e)), 400
+    except (AttributeError, AssertionError, TypeError, ValueError) as e:
+        logging.exception(e)
+        return str(e), 400
     except Exception as e:
-        logging.exception('Exception occurred {}'.format(e))
-        return jsonify(str(e)), 401
+        logging.exception(e)
+        return 'Please contact with support', 400
 
 @app.route('/values')
-def valuesController():
-    return jsonify({'about':'FLASK API REST RUNNING'})
+def values_controller():
+    return 'Api is running'
 
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host='0.0.0.0', port=8083)
-    #app.run(host='0.0.0.0')
+    serve(app, host='0.0.0.0', port=8083) # waitress-serve --port=8083 app:app
+    # app.run(host='0.0.0.0') # flask run

@@ -31,7 +31,7 @@ app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/api')
 
 ingestionKey = 'b7c813e09f26938d8bcd7c4f38be2a40'
 logdna_options = {
-  'app': 'stt',
+  'app': 'googletrans',
   'level': 'Debug',
   'index_meta': True
 }

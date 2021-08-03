@@ -40,7 +40,7 @@ logging.basicConfig(
         logging.FileHandler(filename='log.log', encoding='utf-8', mode='a+'),
         LogDNAHandler(ingestionKey, logdna_options)
     ],
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     datefmt='%Y%m%d.%H%M%S'
 )
